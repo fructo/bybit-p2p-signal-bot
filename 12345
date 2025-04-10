@@ -1,0 +1,93 @@
+import time
+import threading
+import requests
+import pandas as pd
+from telegram import Update
+from telegram.ext import Updater, CommandHandler, CallbackContext
+from config import TELEGRAM_BOT_TOKEN, cookies, headers  # Импортируем конфигурацию
+
+# Функция для отправки запроса и фильтрации данных
+def get_filtered_data():
+    params = {
+        "userId": 69511891,
+        "tokenId": "USDT",
+        "currencyId": "RUB",
+        "payment": ["377"],
+        "side": "1",
+        "size": "10",
+        "page": "1"
+    }
+
+    # Отправляем запрос с куками и заголовками
+    response = requests.post(
+        url="https://api2.bybit.com/fiat/otc/item/online",
+        json=params,
+        cookies=cookies,  # Используем куки из config.py
+        headers=headers   # Используем заголовки из config.py
+    ).json()
+
+    data = {
+        'id': [],
+        'nickName': [],
+        'price': [],
+        'maxAmount': [],
+        'remark': []
+    }
+
+    for item in response['result']['items']:
+        data['id'].append(item['id'])
+        data['nickName'].append(item['nickName'])
+        data['price'].append(item['price'])
+        data['maxAmount'].append(item['maxAmount'])
+        data['remark'].append(item['remark'])
+
+    df = pd.DataFrame(data)
+
+    # Преобразование столбцов в числовой формат
+    df['maxAmount'] = pd.to_numeric(df['maxAmount'], errors='coerce')
+    df['price'] = pd.to_numeric(df['price'], errors='coerce')
+
+    # Фильтрация данных
+    filtered_df = df[(df['maxAmount'] > 80000) & (df['price'] < 93.5)]
+
+    return filtered_df[['nickName', 'price', 'maxAmount', 'remark']]
+
+# Функция для отправки обновлений данных в чат
+def send_data(update: Update, context: CallbackContext) -> None:
+    chat_id = update.message.chat_id
+
+    def fetch_and_send():
+        while True:
+            # Получаем отфильтрованные данные
+            filtered_data = get_filtered_data()
+
+            # Форматируем данные для отправки в чат
+            if filtered_data.empty:
+                message = "Нет данных, соответствующих условиям."
+            else:
+                message = filtered_data.to_string(index=False)
+
+            # Отправляем сообщение в чат
+            context.bot.send_message(chat_id=chat_id, text=message)
+
+            # Ожидаем 5 секунд перед следующим запросом
+            time.sleep(5)
+
+    # Запускаем фоновый поток для периодических запросов
+    threading.Thread(target=fetch_and_send, daemon=True).start()
+
+# Основная функция для запуска бота
+def main():
+    # Инициализация бота
+    updater = Updater(TELEGRAM_BOT_TOKEN, use_context=True)
+    dispatcher = updater.dispatcher
+
+    # Обработчик команды /start
+    dispatcher.add_handler(CommandHandler("start", send_data))
+
+    # Запуск бота
+    updater.start_polling()
+    updater.idle()
+
+if __name__ == '__main__':
+    main()
