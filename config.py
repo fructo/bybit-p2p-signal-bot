@@ -1,7 +1,7 @@
 # config.py
 
 # Токен Telegram-бота
-TELEGRAM_BOT_TOKEN = '7867657392:AAEgyM-amQ9W6v4NmSbEPcr57UIzLf7Pp4M'
+TELEGRAM_BOT_TOKEN = '7867657392:AAEgyM-amQ9W6v4NmS12bEPcr57UIzLf7Pp4M'
 
 # Куки для запроса
 cookies = {
